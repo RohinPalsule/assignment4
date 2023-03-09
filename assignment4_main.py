@@ -25,9 +25,12 @@ class SignalDetection:
         return -0.5 * (norm.ppf(self.hitRate()) + norm.ppf(self.falseAlarmRate()))
     @staticmethod
     def simulate(dprime, criteriaList, signalCount, noiseCount):
+        # ask about 0.5 value
         sdtList = [None] * len(criteriaList)
         for i in range(len(criteriaList)):
-            sdtList[i] = SignalDetection(np.random.binomial(signalCount, 0.5), np.random.binomial(signalCount, 0.5), np.random.binomial(noiseCount, 0.5), np.random.binomial(noiseCount, 0.5))
+            hRate = norm.cdf((dprime - 2*criteriaList[i])/2)
+            faRate = norm.cdf((- dprime - 2*criteriaList[i])/2)
+            sdtList[i] = SignalDetection(np.random.binomial(signalCount, hRate), np.random.binomial(signalCount, 1-hRate), np.random.binomial(noiseCount, faRate), np.random.binomial(noiseCount, 1 - faRate))
         return sdtList
     @staticmethod
     def plot_roc(sdtList):
@@ -39,7 +42,7 @@ class SignalDetection:
         y[len(sdtList) + 1] = 1
         for i in range(1,len(sdtList)):
             y[i] = sdtList[i].hitRate()
-        plt.plot(sorted(x), sorted(y), marker="o")
+        plt.plot(sorted(x), sorted(y), marker="o", linestyle="None")
         plt.xlabel('False Alarm Rate')
         plt.ylabel('Hit Rate')
         plt.title('ROC Plot')
@@ -55,30 +58,31 @@ class SignalDetection:
         plt.title('Signal Detection Theory Plot')
         plt.legend(loc="upper left")
         plt.show()
-    def nLogLikelihood(self,hitRate, falseAlarmRate):
-        return - (self.hits * np.log(hitRate) + self.misses * np.log(1-hitRate) + self.falseAlarms * np.log(falseAlarmRate) + self.correctRejections * np.log(1-falseAlarmRate))
+    def nLogLikelihood(self, hitRate, falseAlarmRate):
+        ell = - (self.hits * np.log(hitRate) + self.misses * np.log(1-hitRate) + self.falseAlarms * np.log(falseAlarmRate) + self.correctRejections * np.log(1-falseAlarmRate))
+        return ell
     @staticmethod
     def rocCurve(falseAlarmRate, a):
         hitRate = norm.cdf(a + norm.ppf(falseAlarmRate))
         return hitRate
     @staticmethod
-    def fit_roc(sdtList):
-        L = [None] * len(sdtList)
-        H = [None] * len(sdtList)
-        Dprime = [None] * len(sdtList)
-        for i in range(len(sdtList)):
-            Dprime = sdtList[i].d_prime()
-            H[i] = sdtList[i].rocCurve(sdtList[i].falseAlarmRate(), 0)
-            L[i] = sdtList[i].nLogLikelihood(H[i], sdtList[i].falseAlarmRate())
-        return minimize(L, Dprime, method = 'Nelder-Mead')
-    @staticmethod
     def rocLoss(a, sdtList):
-        L = [None] * len(sdtList)
-        H = [None] * len(sdtList)
+        L = 0
         for i in range(len(sdtList)):
-            H[i] = sdtList[i].rocCurve(sdtList[i].falseAlarmRate(), a)
-            L[i] = sdtList[i].nLogLikelihood(H[i], sdtList[i].falseAlarmRate())
-        return sum(L)
+            HitRate = sdtList[i].rocCurve(sdtList[i].falseAlarmRate(), a)
+            L += sdtList[i].nLogLikelihood(HitRate, sdtList[i].falseAlarmRate())
+        return L
+    @staticmethod
+    def fit_roc(sdtList):
+        def objective(a):
+            L = 0
+            for i in range(len(sdtList)):
+                HitRate = sdtList[i].rocCurve(sdtList[i].falseAlarmRate(), a)
+                L += sdtList[i].nLogLikelihood(HitRate, sdtList[i].falseAlarmRate())
+            return L
+        result = minimize(fun = objective, x0 = np.random.randn(), args = ())
+        aHat = result.x[0]
+        return aHat
     
 class TestSignalDetection(unittest.TestCase):
     """
