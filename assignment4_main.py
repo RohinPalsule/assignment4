@@ -29,6 +29,7 @@ class SignalDetection:
         for i in range(len(criteriaList)):
             hRate = norm.cdf((dprime - 2*criteriaList[i])/2)
             faRate = norm.cdf((- dprime - 2*criteriaList[i])/2)
+            # Hit and False alarm rates calculated given dprime and criterion values
             sdtList[i] = SignalDetection(np.random.binomial(signalCount, hRate), np.random.binomial(signalCount, 1-hRate), np.random.binomial(noiseCount, faRate), np.random.binomial(noiseCount, 1 - faRate))
         return sdtList
     def plot_sdt(self):
