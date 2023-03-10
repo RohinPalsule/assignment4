@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import norm
-from scipy.optimize import minimize, rosen
+from scipy.optimize import minimize
 import unittest
 import matplotlib.pyplot as plt
 
@@ -25,28 +25,12 @@ class SignalDetection:
         return -0.5 * (norm.ppf(self.hitRate()) + norm.ppf(self.falseAlarmRate()))
     @staticmethod
     def simulate(dprime, criteriaList, signalCount, noiseCount):
-        # ask about 0.5 value
         sdtList = [None] * len(criteriaList)
         for i in range(len(criteriaList)):
             hRate = norm.cdf((dprime - 2*criteriaList[i])/2)
             faRate = norm.cdf((- dprime - 2*criteriaList[i])/2)
             sdtList[i] = SignalDetection(np.random.binomial(signalCount, hRate), np.random.binomial(signalCount, 1-hRate), np.random.binomial(noiseCount, faRate), np.random.binomial(noiseCount, 1 - faRate))
         return sdtList
-    @staticmethod
-    def plot_roc(sdtList):
-        x = [0] * (len(sdtList) + 2)
-        x[len(sdtList) + 1] = 1
-        for i in range(1, len(sdtList)):
-            x[i] = sdtList[i].falseAlarmRate()
-        y = [0] * (len(sdtList) + 2)
-        y[len(sdtList) + 1] = 1
-        for i in range(1,len(sdtList)):
-            y[i] = sdtList[i].hitRate()
-        plt.plot(sorted(x), sorted(y), marker="o", linestyle="None")
-        plt.xlabel('False Alarm Rate')
-        plt.ylabel('Hit Rate')
-        plt.title('ROC Plot')
-        plt.show()
     def plot_sdt(self):
         plt.axvline((self.d_prime() / 2) + self.criterion(), color = 'yellow')
         plt.axhline(y = 0.4, color = 'g', xmin = 0.5, xmax = (self.d_prime() + 5)/10)
@@ -73,15 +57,32 @@ class SignalDetection:
             L += sdtList[i].nLogLikelihood(HitRate, sdtList[i].falseAlarmRate())
         return L
     @staticmethod
+    def plot_roc(sdtList):
+        x = [0] * (len(sdtList) + 2)
+        # Done so 0 and 1 are included in the plot
+        x[len(sdtList) + 1] = 1
+        for i in range(1, len(sdtList)):
+            x[i] = sdtList[i].falseAlarmRate()
+        y = [0] * (len(sdtList) + 2)
+        y[len(sdtList) + 1] = 1
+        for i in range(1,len(sdtList)):
+            y[i] = sdtList[i].hitRate()
+        plt.plot(sorted(x), sorted(y), marker="o", linestyle="None", color ='black')
+        plt.plot(np.arange(0,1,0.01), np.arange(0,1,0.01), linestyle='dashed', color = 'black')
+        plt.xlabel('False Alarm Rate')
+        plt.ylabel('Hit Rate')
+        plt.title('ROC Plot')
+    @staticmethod
     def fit_roc(sdtList):
-        def objective(a):
-            L = 0
-            for i in range(len(sdtList)):
-                HitRate = sdtList[i].rocCurve(sdtList[i].falseAlarmRate(), a)
-                L += sdtList[i].nLogLikelihood(HitRate, sdtList[i].falseAlarmRate())
-            return L
-        result = minimize(fun = objective, x0 = np.random.randn(), args = ())
+        def roc_Loss(a):
+            return SignalDetection.rocLoss(a, sdtList)
+        result = minimize(fun = roc_Loss, x0 = np.random.randn(), args = ())
         aHat = result.x[0]
+        x_line = np.arange(0,1,0.01)
+        y_line = SignalDetection.rocCurve(x_line, aHat)
+        SignalDetection.plot_roc(sdtList)
+        plt.plot(x_line, y_line, color ='r')
+        plt.show()
         return aHat
     
 class TestSignalDetection(unittest.TestCase):
