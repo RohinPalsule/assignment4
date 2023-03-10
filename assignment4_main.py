@@ -76,7 +76,7 @@ class SignalDetection:
     def fit_roc(sdtList):
         def roc_Loss(a):
             return SignalDetection.rocLoss(a, sdtList)
-        result = minimize(fun = roc_Loss, x0 = np.random.randn(), args = ())
+        result = minimize(fun = roc_Loss, x0 = np.random.randn())
         aHat = result.x[0]
         x_line = np.arange(0,1,0.01)
         y_line = SignalDetection.rocCurve(x_line, aHat)
